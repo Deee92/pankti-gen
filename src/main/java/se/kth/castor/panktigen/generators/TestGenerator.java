@@ -1,5 +1,8 @@
-package se.kth.castor.panktigen;
+package se.kth.castor.panktigen.generators;
 
+import se.kth.castor.panktigen.parsers.CSVFileParser;
+import se.kth.castor.panktigen.parsers.InstrumentedMethod;
+import se.kth.castor.panktigen.parsers.ObjectXMLParser;
 import spoon.reflect.CtModel;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;
@@ -10,6 +13,31 @@ import java.util.*;
 
 public class TestGenerator {
     List<CtType<?>> classTypes = new ArrayList<>();
+
+    // This will be replaced by text parsed from XML files
+    static String receivingXML = "\"" +
+            "<org.apache.fontbox.cmap.CodespaceRange>\n" +
+            "  <start>\n" +
+            "    <int>0</int>\n" +
+            "    <int>0</int>\n" +
+            "  </start>\n" +
+            "  <end>\n" +
+            "    <int>255</int>\n" +
+            "    <int>255</int>\n" +
+            "  </end>\n" +
+            "  <codeLength>2</codeLength>\n" +
+            "</org.apache.fontbox.cmap.CodespaceRange>" +
+            "\"";
+    static String paramsXML = "\"" +
+            "<object-array>\n" +
+            "  <byte-array>ACs=</byte-array>\n" +
+            "  <int>2</int>\n" +
+            "</object-array>"
+            + "\"";
+    static String returnedXML = "\"" +
+            "<boolean>true</boolean>"
+            + "\"";
+
     private static Factory factory;
     private static final String X_STREAM_REFERENCE = "com.thoughtworks.xstream.XStream";
     private static final String JUNIT_REFERENCE = "org.junit.Test";
@@ -83,43 +111,55 @@ public class TestGenerator {
         generatedMethod.addAnnotation(testAnnotation);
         generatedMethod.setModifiers(Collections.singleton(ModifierKind.PUBLIC));
         generatedMethod.setType(factory.createCtTypeReference(void.class));
-        CtStatement generatedStatement1 = factory.createCodeSnippetStatement(
+
+        CtStatement receivingXMLStringDeclaration = addStringVariableToTestMethod("receivingXML", receivingXML);
+        System.out.println(receivingXMLStringDeclaration);
+        CtStatement paramsXMLStringDeclaration = addStringVariableToTestMethod("paramsXML", paramsXML);
+        System.out.println(paramsXMLStringDeclaration);
+        CtStatement returnedXMLStringDeclaration = addStringVariableToTestMethod("returnedXML", returnedXML);
+        System.out.println(returnedXMLStringDeclaration);
+
+        CtStatement parseReceivingObject = factory.createCodeSnippetStatement(
                 String.format(
                         "%s receivingObject = (%s) xStream.fromXML(receivingXML)",
                         "org.apache.fontbox.cmap.CodespaceRange",
                         "org.apache.fontbox.cmap.CodespaceRange"));
-        CtStatement generatedStatement2 = factory.createCodeSnippetStatement(
+        CtStatement parseReturnedObject = factory.createCodeSnippetStatement(
                 String.format(
                         "%s returnedObject = (%s) xStream.fromXML(returnedXML)",
                         "boolean",
                         "Boolean"));
-        CtStatement generatedStatement3 = factory.createCodeSnippetStatement(
+        CtStatement parseParamObjects = factory.createCodeSnippetStatement(
                 String.format(
                         "%s paramObjects = (%s) xStream.fromXML(paramsXML)",
                         "Object[]",
                         "Object[]"));
-        CtStatement generatedStatement4 = factory.createCodeSnippetStatement(
+        CtStatement parseParamObject1 = factory.createCodeSnippetStatement(
                 String.format(
                         "%s paramObject1 = (%s) paramObjects[0]",
                         "byte[]",
-                        "Byte[]"));
-        CtStatement generatedStatement5 = factory.createCodeSnippetStatement(
+                        "byte[]"));
+        CtStatement parseParamObject2 = factory.createCodeSnippetStatement(
                 String.format(
                         "%s paramObject2 = (%s) paramObjects[1]",
                         "int",
                         "Integer"));
 
         CtBlock<?> methodBody = factory.createBlock();
-        methodBody.addStatement(generatedStatement1);
-        methodBody.addStatement(generatedStatement2);
-        methodBody.addStatement(generatedStatement3);
-        methodBody.addStatement(generatedStatement4);
-        methodBody.addStatement(generatedStatement5);
+        methodBody.addStatement(receivingXMLStringDeclaration);
+        methodBody.addStatement(paramsXMLStringDeclaration);
+        methodBody.addStatement(returnedXMLStringDeclaration);
+        methodBody.addStatement(parseReceivingObject);
+        methodBody.addStatement(parseReturnedObject);
+        methodBody.addStatement(parseParamObjects);
+        methodBody.addStatement(parseParamObject1);
+        methodBody.addStatement(parseParamObject2);
 
         generatedMethod.setBody(methodBody);
 
         CtInvocation<?> assertEqualsInvocation = generateAssertionInTestMethod();
         generatedMethod.getBody().addStatement(assertEqualsInvocation);
+        System.out.println("Final method body: " + generatedMethod.getBody());
 
         return generatedMethod;
     }
@@ -129,32 +169,12 @@ public class TestGenerator {
         CtClass<?> generatedClass = generateTestClass(type.getPackage(), type.getSimpleName());
         addImportsToGeneratedClass(generatedClass);
 
-        String receivingXML = "\"" +
-                "<org.apache.fontbox.cmap.CodespaceRange>\n" +
-                "  <start>\n" +
-                "    <int>0</int>\n" +
-                "    <int>0</int>\n" +
-                "  </start>\n" +
-                "  <end>\n" +
-                "    <int>255</int>\n" +
-                "    <int>255</int>\n" +
-                "  </end>\n" +
-                "  <codeLength>2</codeLength>\n" +
-                "</org.apache.fontbox.cmap.CodespaceRange>" +
-                "\"";
-        String paramsXML = "\"" +
-                "<object-array>\n" +
-                "  <byte-array>ACs=</byte-array>\n" +
-                "  <int>2</int>\n" +
-                "</object-array>"
-                + "\"";
-        String returnedXML = "\"" +
-                "<boolean>true</boolean>"
-                + "\"";
-
-        // Add XStream field to class
         try {
+            // Add XStream field to class
             generatedClass.addField(addXStreamFieldToGeneratedClass());
+            // Create @Test method
+            CtMethod<?> generatedMethod = generateTestMethod(method.getSimpleName());
+            generatedClass.addMethod(generatedMethod);
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
@@ -162,35 +182,32 @@ public class TestGenerator {
 //        generatedClass.addField(addStringFieldToGeneratedClass("receivingXML", receivingXML));
 //        generatedClass.addField(addStringFieldToGeneratedClass("paramsXML", paramsXML));
 //        generatedClass.addField(addStringFieldToGeneratedClass("returnedXML", returnedXML));
-        // Create @Test method
-        try {
-            CtMethod<?> generatedMethod = generateTestMethod(method.getSimpleName());
-            generatedMethod.getBody().addStatement(addStringVariableToTestMethod("receivingXML", receivingXML));
-            generatedMethod.getBody().addStatement(addStringVariableToTestMethod("paramsXML", paramsXML));
-            generatedMethod.getBody().addStatement(addStringVariableToTestMethod("returnedXML", returnedXML));
-            generatedClass.addMethod(generatedMethod);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
+
         return generatedClass;
     }
 
     public List<CtType<?>> getNonAbstractClassTypes(CtModel ctModel) {
+        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
         List<CtType<?>> types = (List<CtType<?>>) ctModel.getAllTypes();
         System.out.println(types.size());
         for (CtType<?> type : types) {
             if (type.isClass() && !type.isAbstract()) {
                 String fqn = type.getPackage() + "." + type.getSimpleName();
-                if (fqn.equals("org.apache.fontbox.cmap.CodespaceRange")) {
-                    CtMethod<?> method = type.getMethodsByName("isFullMatch").get(0);
-                    System.out.println("Generating test method for: " + method.getPath());
-                    CtClass<?> generatedClass = generateFullTestClass(type, method);
-                    System.out.println("Generated test class: " + generatedClass.getQualifiedName());
+                if (instrumentedMethods.size() > 0) {
+                    for (InstrumentedMethod instrumentedMethod : instrumentedMethods) {
+                        if (fqn.equals(instrumentedMethod.getParentFQN())) {
+                            List<CtMethod<?>> methodsByName = type.getMethodsByName(instrumentedMethod.getMethodName());
+                            if (methodsByName.size() == 1) {
+                                System.out.println("Generating test method for: " + methodsByName.get(0).getPath());
+                                CtClass<?> generatedClass = generateFullTestClass(type, methodsByName.get(0));
+                                System.out.println("Generated test class: " + generatedClass.getQualifiedName());
+                            }
+                        }
+                    }
                 }
-                classTypes.add(type);
             }
+            classTypes.add(type);
         }
-        CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
         ObjectXMLParser.parseXML("/home/user/pdfbox-object-data/17-pdfbox-receiving.xml");
         ObjectXMLParser.parseXML("/home/user/pdfbox-object-data/17-pdfbox-params.xml");
         ObjectXMLParser.parseXML("/home/user/pdfbox-object-data/17-pdfbox-returned.xml");

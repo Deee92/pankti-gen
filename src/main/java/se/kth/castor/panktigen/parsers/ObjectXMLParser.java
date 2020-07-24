@@ -1,4 +1,4 @@
-package se.kth.castor.panktigen;
+package se.kth.castor.panktigen.parsers;
 
 import org.w3c.dom.*;
 

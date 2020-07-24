@@ -1,6 +1,7 @@
 package se.kth.castor.panktigen;
 
 import picocli.CommandLine;
+import se.kth.castor.panktigen.generators.TestGenerator;
 import spoon.MavenLauncher;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtType;
