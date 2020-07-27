@@ -31,6 +31,14 @@ public class InstrumentedMethod {
         return returnType;
     }
 
+    public boolean hasParams() {
+        return this.getParamList().size() > 0;
+    }
+
+    public String getFullMethodPath() {
+        return this.parentFQN + "." + this.getMethodName();
+    }
+
     @Override
     public String toString() {
         return "InstrumentedMethod{" +

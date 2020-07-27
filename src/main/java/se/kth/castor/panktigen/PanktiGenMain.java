@@ -4,11 +4,9 @@ import picocli.CommandLine;
 import se.kth.castor.panktigen.generators.TestGenerator;
 import spoon.MavenLauncher;
 import spoon.reflect.CtModel;
-import spoon.reflect.declaration.CtType;
 import spoon.support.compiler.SpoonPom;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 @CommandLine.Command(
@@ -53,8 +51,7 @@ public class PanktiGenMain implements Callable<Integer> {
         System.out.println("Number of Maven modules: " + projectPom.getModel().getModules().size());
 
         TestGenerator testGenerator = new TestGenerator();
-        List<CtType<?>> classTypes = testGenerator.getNonAbstractClassTypes(model);
-        System.out.println("Class types: " + classTypes.size());
+        testGenerator.process(model);
 
         // Save model in outputdir/
 
