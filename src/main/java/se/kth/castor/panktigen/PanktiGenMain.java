@@ -49,12 +49,12 @@ public class PanktiGenMain implements Callable<Integer> {
         SpoonPom projectPom = launcher.getPomFile();
 
         CtModel model = panktiGenLauncher.buildSpoonModel(launcher);
+        System.out.println("POM found at: " + projectPom.getPath());
+        System.out.println("Number of Maven modules: " + projectPom.getModel().getModules().size());
+
         TestGenerator testGenerator = new TestGenerator();
         List<CtType<?>> classTypes = testGenerator.getNonAbstractClassTypes(model);
         System.out.println("Class types: " + classTypes.size());
-
-        System.out.println("POM found at: " + projectPom.getPath());
-        System.out.println("Number of Maven modules: " + projectPom.getModel().getModules().size());
 
         // Save model in outputdir/
 

@@ -95,12 +95,12 @@ public class TestGenerator {
         executableReference.setStatic(true);
         executableReference.setDeclaringType(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE)));
         executableReference.setSimpleName("assertEquals");
-        System.out.println("executableReference: " + executableReference);
+        // System.out.println("executableReference: " + executableReference);
         CtInvocation assertEqualsInvocation = factory.createInvocation();
         assertEqualsInvocation.setExecutable(executableReference);
         assertEqualsInvocation.setTarget(factory.createTypeAccess(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE))));
         assertEqualsInvocation.setArguments(Arrays.asList(assertEqualsExpected, assertEqualsActual));
-        System.out.println(assertEqualsInvocation);
+        // System.out.println(assertEqualsInvocation);
         return assertEqualsInvocation;
     }
 
@@ -159,7 +159,7 @@ public class TestGenerator {
 
         CtInvocation<?> assertEqualsInvocation = generateAssertionInTestMethod();
         generatedMethod.getBody().addStatement(assertEqualsInvocation);
-        System.out.println("Final method body: " + generatedMethod.getBody());
+        // System.out.println("Final method body: " + generatedMethod.getBody());
 
         return generatedMethod;
     }
@@ -187,7 +187,7 @@ public class TestGenerator {
     }
 
     public List<CtType<?>> getNonAbstractClassTypes(CtModel ctModel) {
-        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
+        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/one-method.csv");
         List<CtType<?>> types = (List<CtType<?>>) ctModel.getAllTypes();
         System.out.println(types.size());
         for (CtType<?> type : types) {
