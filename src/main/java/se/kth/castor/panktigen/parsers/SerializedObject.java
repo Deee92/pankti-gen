@@ -23,7 +23,7 @@ public class SerializedObject {
         return this.paramObjects.get("paramObjects");
     }
 
-    public String getReturnedObjects() {
+    public String getReturnedObject() {
         return this.returnedObject.get("returnedObject");
     }
 

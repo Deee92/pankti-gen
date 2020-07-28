@@ -60,9 +60,21 @@ public class TestGenerator {
     }
 
     @SuppressWarnings("unchecked")
-    public CtInvocation<?> generateAssertionInTestMethod() throws ClassNotFoundException {
+    public CtInvocation<?> generateAssertionInTestMethod(CtMethod<?> method) throws ClassNotFoundException {
         CtExpression<?> assertEqualsExpected = factory.createCodeSnippetExpression("returnedObject");
-        CtExpression<?> assertEqualsActual = factory.createCodeSnippetExpression("receivingObject.isFullMatch(paramObject1, paramObject2)");
+
+        StringBuilder arguments = new StringBuilder();
+        for (int i = 1; i <= method.getParameters().size(); i++) {
+            arguments.append("paramObject").append(i);
+            if (i != method.getParameters().size()) {
+                arguments.append(", ");
+            }
+        }
+
+        CtExpression<?> assertEqualsActual = factory.createCodeSnippetExpression(
+                String.format("receivingObject.%s(%s)",
+                        method.getSimpleName(),
+                        arguments.toString()));
 
         CtExecutableReference<?> executableReference = factory.createExecutableReference();
         executableReference.setStatic(true);
@@ -90,7 +102,7 @@ public class TestGenerator {
 
         String receivingXML = serializedObject.getReceivingObject();
         String receivingObjectType = serializedObject.getObjectType(receivingXML);
-        String returnedXML = serializedObject.getReturnedObjects();
+        String returnedXML = serializedObject.getReturnedObject();
         String returnedObjectType = instrumentedMethod.getReturnType();
 
         CtStatement receivingXMLStringDeclaration = addStringVariableToTestMethod("receivingXML", receivingXML);
@@ -141,7 +153,7 @@ public class TestGenerator {
         }
         generatedMethod.setBody(methodBody);
 
-        CtInvocation<?> assertEqualsInvocation = generateAssertionInTestMethod();
+        CtInvocation<?> assertEqualsInvocation = generateAssertionInTestMethod(method);
         generatedMethod.getBody().addStatement(assertEqualsInvocation);
         // System.out.println("Final method body: " + generatedMethod.getBody());
 
