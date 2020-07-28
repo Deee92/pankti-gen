@@ -166,7 +166,8 @@ public class TestGenerator {
         addImportsToGeneratedClass(generatedClass);
 
         String methodPath = instrumentedMethod.getFullMethodPath();
-        Set<SerializedObject> serializedObjects = ObjectXMLParser.parseXML("/home/user/object-data/" + methodPath);
+        ObjectXMLParser objectXMLParser = new ObjectXMLParser();
+        Set<SerializedObject> serializedObjects = objectXMLParser.parseXML("/home/user/object-data/" + methodPath);
         System.out.println("Number of unique pairs/triples of object values: " + serializedObjects.size());
 
         try {
@@ -174,7 +175,7 @@ public class TestGenerator {
             generatedClass.addField(addXStreamFieldToGeneratedClass());
             // Create @Test method
             int methodCounter = 1;
-            for (SerializedObject serializedObject: serializedObjects) {
+            for (SerializedObject serializedObject : serializedObjects) {
                 CtMethod<?> generatedMethod = generateTestMethod(method, methodCounter, instrumentedMethod, serializedObject);
                 generatedClass.addMethod(generatedMethod);
                 methodCounter++;
@@ -195,14 +196,14 @@ public class TestGenerator {
     }
 
     public void process(CtModel ctModel) {
-        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/one-method.csv");
+        // Get list of instrumented methods from CSV file
+        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
         List<CtType<?>> types = getTypesToProcess(ctModel);
 
         for (CtType<?> type : types) {
-            String fqn = type.getPackage() + "." + type.getSimpleName();
             if (instrumentedMethods.size() > 0) {
                 for (InstrumentedMethod instrumentedMethod : instrumentedMethods) {
-                    if (fqn.equals(instrumentedMethod.getParentFQN())) {
+                    if (type.getQualifiedName().equals(instrumentedMethod.getParentFQN())) {
                         List<CtMethod<?>> methodsByName = type.getMethodsByName(instrumentedMethod.getMethodName());
                         if (methodsByName.size() == 1) {
                             System.out.println("Generating test method for: " + methodsByName.get(0).getPath());

@@ -23,8 +23,6 @@ public class CSVFileParser {
                 String params = record.get(csvParamListField);
                 String returnType = record.get(csvReturnTypeField);
 
-                params = params.replaceAll("^\\[", "");
-                params = params.replaceAll("\\b\\]", "");
                 params = params.replaceAll("\\s", "");
 
                 List<String> paramList = new ArrayList<>();

@@ -9,12 +9,12 @@ import java.util.*;
 import org.w3c.dom.ls.*;
 
 public class ObjectXMLParser {
-    static Set<SerializedObject> serializedObjects = new HashSet<>();
+    Set<SerializedObject> serializedObjects = new HashSet<>();
     private static final String receivingObjectFilePostfix = "-receiving.xml";
     private static final String paramObjectsFilePostfix = "-params.xml";
     private static final String returnedObjectFilePostfix = "-returned.xml";
 
-    public static InputStream addRootElementToXMLFile(File inputFile) throws FileNotFoundException {
+    public InputStream addRootElementToXMLFile(File inputFile) throws FileNotFoundException {
         FileInputStream fis = new FileInputStream(inputFile);
         List<InputStream> streams =
                 Arrays.asList(
@@ -24,11 +24,11 @@ public class ObjectXMLParser {
         return new SequenceInputStream(Collections.enumeration(streams));
     }
 
-    public static File findXMLFileByObjectType(String basePath, String type) {
+    public File findXMLFileByObjectType(String basePath, String type) {
         return new File(basePath + type);
     }
 
-    public static List<String> parseXMLInFile(File inputFile) throws Exception {
+    public List<String> parseXMLInFile(File inputFile) throws Exception {
         List<String> rawXMLObjects = new ArrayList<>();
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -48,13 +48,15 @@ public class ObjectXMLParser {
             Node thisNode = childNodes.item(i);
             String rawXMLForObject = ser.writeToString(thisNode);
             rawXMLForObject = rawXMLForObject.replaceAll("(\\<\\?xml version=\"1\\.0\" encoding=\"UTF-16\"\\?>)", "");
-            rawXMLForObject = rawXMLForObject.replaceAll("\\s", "");
+            rawXMLForObject = rawXMLForObject.replaceAll("\"","\\\\\"");
+            rawXMLForObject = rawXMLForObject.replaceAll("[ ]{2,}", "");
+            rawXMLForObject = rawXMLForObject.replaceAll("\\n", "");
             rawXMLObjects.add(rawXMLForObject);
         }
         return rawXMLObjects;
     }
 
-    public static Set<SerializedObject> parseXML(String basePath) {
+    public Set<SerializedObject> parseXML(String basePath) {
         try {
             File receivingObjectFile = findXMLFileByObjectType(basePath, receivingObjectFilePostfix);
             List<String> receivingObjects = parseXMLInFile(receivingObjectFile);
