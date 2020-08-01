@@ -22,6 +22,10 @@ public class TestGenerator {
     private static final String TEST_CLASS_PREFIX = "Test";
     private static final String TEST_CLASS_POSTFIX = "PanktiGen";
 
+    public String getGeneratedClassName(CtPackage ctPackage, String className) {
+        return String.format("%s.%s%s%s", ctPackage, TEST_CLASS_PREFIX, className, TEST_CLASS_POSTFIX);
+    }
+
     public CtClass<?> generateTestClass(CtPackage ctPackage, String className) {
         CtClass<?> generatedClass = factory.createClass(ctPackage, TEST_CLASS_PREFIX + className + TEST_CLASS_POSTFIX);
         generatedClass.addModifier(ModifierKind.PUBLIC);
@@ -160,28 +164,25 @@ public class TestGenerator {
         return generatedMethod;
     }
 
-    public CtClass<?> generateFullTestClass(CtType<?> type, CtMethod<?> method, InstrumentedMethod instrumentedMethod) {
+    public CtClass<?> generateFullTestClass(CtType<?> type, CtMethod<?> method, InstrumentedMethod instrumentedMethod) throws ClassNotFoundException {
         factory = type.getFactory();
-        CtClass<?> generatedClass = generateTestClass(type.getPackage(), type.getSimpleName());
-        addImportsToGeneratedClass(generatedClass);
-
+        CtClass<?> generatedClass = factory.Class().get(getGeneratedClassName(type.getPackage(), type.getSimpleName()));
+        if (generatedClass == null) {
+            generatedClass = generateTestClass(type.getPackage(), type.getSimpleName());
+            addImportsToGeneratedClass(generatedClass);
+            generatedClass.addField(addXStreamFieldToGeneratedClass());
+        }
         String methodPath = instrumentedMethod.getFullMethodPath();
         ObjectXMLParser objectXMLParser = new ObjectXMLParser();
-        Set<SerializedObject> serializedObjects = objectXMLParser.parseXML("/home/user/object-data/" + methodPath);
+        Set<SerializedObject> serializedObjects = objectXMLParser.parseXML("/home/user/object-data/" + methodPath, instrumentedMethod.hasParams());
         System.out.println("Number of unique pairs/triples of object values: " + serializedObjects.size());
 
-        try {
-            // Add XStream field to class
-            generatedClass.addField(addXStreamFieldToGeneratedClass());
-            // Create @Test method
-            int methodCounter = 1;
-            for (SerializedObject serializedObject : serializedObjects) {
-                CtMethod<?> generatedMethod = generateTestMethod(method, methodCounter, instrumentedMethod, serializedObject);
-                generatedClass.addMethod(generatedMethod);
-                methodCounter++;
-            }
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+        // Create @Test method
+        int methodCounter = 1;
+        for (SerializedObject serializedObject : serializedObjects) {
+            CtMethod<?> generatedMethod = generateTestMethod(method, methodCounter, instrumentedMethod, serializedObject);
+            generatedClass.addMethod(generatedMethod);
+            methodCounter++;
         }
         return generatedClass;
     }
@@ -207,8 +208,12 @@ public class TestGenerator {
                         List<CtMethod<?>> methodsByName = type.getMethodsByName(instrumentedMethod.getMethodName());
                         if (methodsByName.size() == 1) {
                             System.out.println("Generating test method for: " + methodsByName.get(0).getPath());
-                            CtClass<?> generatedClass = generateFullTestClass(type, methodsByName.get(0), instrumentedMethod);
-                            System.out.println("Generated test class: " + generatedClass.getQualifiedName());
+                            try {
+                                CtClass<?> generatedClass = generateFullTestClass(type, methodsByName.get(0), instrumentedMethod);
+                                System.out.println("Generated test class: " + generatedClass.getQualifiedName());
+                            } catch (ClassNotFoundException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }

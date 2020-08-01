@@ -23,10 +23,9 @@ public class CSVFileParser {
                 String params = record.get(csvParamListField);
                 String returnType = record.get(csvReturnTypeField);
 
-                params = params.replaceAll("\\s", "");
-
                 List<String> paramList = new ArrayList<>();
                 if (!params.isEmpty()) {
+                    params = params.replaceAll("\\s", "");
                     paramList = new ArrayList<>(Arrays.asList(params.split(",")));
                 }
 

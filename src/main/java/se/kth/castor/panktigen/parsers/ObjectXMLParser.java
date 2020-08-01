@@ -48,7 +48,7 @@ public class ObjectXMLParser {
             Node thisNode = childNodes.item(i);
             String rawXMLForObject = ser.writeToString(thisNode);
             rawXMLForObject = rawXMLForObject.replaceAll("(\\<\\?xml version=\"1\\.0\" encoding=\"UTF-16\"\\?>)", "");
-            rawXMLForObject = rawXMLForObject.replaceAll("\"","\\\\\"");
+            rawXMLForObject = rawXMLForObject.replaceAll("\"", "\\\\\"");
             rawXMLForObject = rawXMLForObject.replaceAll("[ ]{2,}", "");
             rawXMLForObject = rawXMLForObject.replaceAll("\\n", "");
             rawXMLObjects.add(rawXMLForObject);
@@ -56,22 +56,25 @@ public class ObjectXMLParser {
         return rawXMLObjects;
     }
 
-    public Set<SerializedObject> parseXML(String basePath) {
+    public Set<SerializedObject> parseXML(String basePath, boolean hasParams) {
         try {
             File receivingObjectFile = findXMLFileByObjectType(basePath, receivingObjectFilePostfix);
             List<String> receivingObjects = parseXMLInFile(receivingObjectFile);
             File returnedObjectFile = findXMLFileByObjectType(basePath, returnedObjectFilePostfix);
             List<String> returnedObjects = parseXMLInFile(returnedObjectFile);
-            File paramObjectsFile = findXMLFileByObjectType(basePath, paramObjectsFilePostfix);
-            List<String> paramObjects = parseXMLInFile(paramObjectsFile);
+            List<String> paramObjects = new ArrayList<>();
+            if (hasParams) {
+                File paramObjectsFile = findXMLFileByObjectType(basePath, paramObjectsFilePostfix);
+                paramObjects = parseXMLInFile(paramObjectsFile);
+            }
 
             for (int i = 0; i < receivingObjects.size(); i++) {
                 if (!receivingObjects.get(i).isEmpty() && !returnedObjects.get(i).isEmpty()) {
-                    SerializedObject serializedObject =
-                            new SerializedObject(
-                                    receivingObjects.get(i),
-                                    returnedObjects.get(i),
-                                    paramObjects.get(i));
+                    String params = hasParams ? paramObjects.get(i) : "";
+                    SerializedObject serializedObject = new SerializedObject(
+                            receivingObjects.get(i),
+                            returnedObjects.get(i),
+                            params);
                     serializedObjects.add(serializedObject);
                 }
             }
