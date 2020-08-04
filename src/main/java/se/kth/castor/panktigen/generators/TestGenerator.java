@@ -1,9 +1,6 @@
 package se.kth.castor.panktigen.generators;
 
-import se.kth.castor.panktigen.parsers.CSVFileParser;
-import se.kth.castor.panktigen.parsers.InstrumentedMethod;
-import se.kth.castor.panktigen.parsers.ObjectXMLParser;
-import se.kth.castor.panktigen.parsers.SerializedObject;
+import se.kth.castor.panktigen.parsers.*;
 import spoon.reflect.CtModel;
 import spoon.reflect.code.*;
 import spoon.reflect.declaration.*;

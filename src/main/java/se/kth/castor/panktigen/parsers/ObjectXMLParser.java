@@ -28,6 +28,16 @@ public class ObjectXMLParser {
         return new File(basePath + type);
     }
 
+    public String cleanUpRawObjectXML(String rawXMLForObject) {
+        rawXMLForObject = rawXMLForObject.replaceAll("(\\<\\?xml version=\"1\\.0\" encoding=\"UTF-16\"\\?>)", "");
+        rawXMLForObject = rawXMLForObject.replaceAll("\"", "\\\\\"");
+        rawXMLForObject = rawXMLForObject.replaceAll("\\\\", "\\\\\\\\");
+        rawXMLForObject = rawXMLForObject.replaceAll("[ ]{2,}", "");
+        rawXMLForObject = rawXMLForObject.replaceAll("\\n", "");
+        rawXMLForObject = rawXMLForObject.replaceAll("(&amp;#x)(\\w+;)", "&#x$2");
+        return rawXMLForObject;
+    }
+
     public List<String> parseXMLInFile(File inputFile) throws Exception {
         List<String> rawXMLObjects = new ArrayList<>();
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
@@ -47,11 +57,7 @@ public class ObjectXMLParser {
         for (int i = 0; i < childNodes.getLength(); i++) {
             Node thisNode = childNodes.item(i);
             String rawXMLForObject = ser.writeToString(thisNode);
-            rawXMLForObject = rawXMLForObject.replaceAll("(\\<\\?xml version=\"1\\.0\" encoding=\"UTF-16\"\\?>)", "");
-            rawXMLForObject = rawXMLForObject.replaceAll("\"", "\\\\\"");
-            rawXMLForObject = rawXMLForObject.replaceAll("[ ]{2,}", "");
-            rawXMLForObject = rawXMLForObject.replaceAll("\\n", "");
-            rawXMLObjects.add(rawXMLForObject);
+            rawXMLObjects.add(cleanUpRawObjectXML(rawXMLForObject));
         }
         return rawXMLObjects;
     }
