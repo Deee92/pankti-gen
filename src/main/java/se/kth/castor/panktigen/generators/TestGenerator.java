@@ -57,7 +57,7 @@ public class TestGenerator {
     public String findObjectBoxType(CtTypeReference typeReference) {
         if (typeReference.isPrimitive())
             return typeReference.box().getSimpleName();
-        else return typeReference.getQualifiedName();
+        else return typeReference.getQualifiedName().replaceAll("\\$", ".");
     }
 
     @SuppressWarnings("unchecked")

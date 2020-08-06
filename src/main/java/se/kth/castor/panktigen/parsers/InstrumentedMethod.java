@@ -12,7 +12,7 @@ public class InstrumentedMethod {
         this.parentFQN = parentFQN;
         this.methodName = methodName;
         this.paramList = paramList;
-        this.returnType = returnType;
+        this.returnType = returnType.replaceAll("\\$", ".");
     }
 
     public String getParentFQN() {
