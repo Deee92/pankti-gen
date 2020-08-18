@@ -18,6 +18,7 @@ public class TestGenerator {
     private static final String JUNIT_ASSERT_REFERENCE = "org.junit.Assert";
     private static final String TEST_CLASS_PREFIX = "Test";
     private static final String TEST_CLASS_POSTFIX = "PanktiGen";
+    private static int numberOfTestCasesGenerated;
 
     public String getGeneratedClassName(CtPackage ctPackage, String className) {
         return String.format("%s.%s%s%s", ctPackage, TEST_CLASS_PREFIX, className, TEST_CLASS_POSTFIX);
@@ -173,6 +174,7 @@ public class TestGenerator {
         ObjectXMLParser objectXMLParser = new ObjectXMLParser();
         Set<SerializedObject> serializedObjects = objectXMLParser.parseXML("/home/user/object-data/" + methodPath, instrumentedMethod.hasParams());
         System.out.println("Number of unique pairs/triples of object values: " + serializedObjects.size());
+        numberOfTestCasesGenerated += serializedObjects.size();
 
         // Create @Test method
         int methodCounter = 1;
@@ -193,7 +195,7 @@ public class TestGenerator {
         return types;
     }
 
-    public void process(CtModel ctModel) {
+    public int process(CtModel ctModel) {
         // Get list of instrumented methods from CSV file
         List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
         List<CtType<?>> types = getTypesToProcess(ctModel);
@@ -216,5 +218,6 @@ public class TestGenerator {
                 }
             }
         }
+        return numberOfTestCasesGenerated;
     }
 }
