@@ -16,6 +16,8 @@ public class TestGenerator {
     private static final String XSTREAM_CONSTRUCTOR = "new XStream()";
     private static final String JUNIT_REFERENCE = "org.junit.Test";
     private static final String JUNIT_ASSERT_REFERENCE = "org.junit.Assert";
+    private static final String JAVA_UTIL_ARRAYS_REFERENCE = "java.util.Arrays";
+
     private static final String TEST_CLASS_PREFIX = "Test";
     private static final String TEST_CLASS_POSTFIX = "PanktiGen";
     private static int numberOfTestCasesGenerated;
@@ -34,6 +36,7 @@ public class TestGenerator {
         generatedClass.getFactory().createUnresolvedImport(XSTREAM_REFERENCE, false);
         generatedClass.getFactory().createUnresolvedImport(JUNIT_REFERENCE, false);
         generatedClass.getFactory().createUnresolvedImport(JUNIT_ASSERT_REFERENCE, false);
+        generatedClass.getFactory().createUnresolvedImport(JAVA_UTIL_ARRAYS_REFERENCE, false);
     }
 
     public CtField<?> addXStreamFieldToGeneratedClass() throws ClassNotFoundException {
@@ -63,7 +66,7 @@ public class TestGenerator {
 
     @SuppressWarnings("unchecked")
     public CtInvocation<?> generateAssertionInTestMethod(CtMethod<?> method) throws ClassNotFoundException {
-        CtExpression<?> assertEqualsExpected = factory.createCodeSnippetExpression("returnedObject");
+        CtExpression<?> assertExpectedObject = factory.createCodeSnippetExpression("returnedObject");
 
         StringBuilder arguments = new StringBuilder();
         for (int i = 1; i <= method.getParameters().size(); i++) {
@@ -73,22 +76,38 @@ public class TestGenerator {
             }
         }
 
-        CtExpression<?> assertEqualsActual = factory.createCodeSnippetExpression(
+        CtExpression<?> assertActualObject = factory.createCodeSnippetExpression(
                 String.format("receivingObject.%s(%s)",
                         method.getSimpleName(),
                         arguments.toString()));
 
-        CtExecutableReference<?> executableReference = factory.createExecutableReference();
-        executableReference.setStatic(true);
-        executableReference.setDeclaringType(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE)));
-        executableReference.setSimpleName("assertEquals");
-        // System.out.println("executableReference: " + executableReference);
-        CtInvocation assertEqualsInvocation = factory.createInvocation();
-        assertEqualsInvocation.setExecutable(executableReference);
-        assertEqualsInvocation.setTarget(factory.createTypeAccess(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE))));
-        assertEqualsInvocation.setArguments(Arrays.asList(assertEqualsExpected, assertEqualsActual));
-        // System.out.println(assertEqualsInvocation);
-        return assertEqualsInvocation;
+        CtExecutableReference<?> executableReferenceForAssertion = factory.createExecutableReference();
+        executableReferenceForAssertion.setStatic(true);
+        executableReferenceForAssertion.setDeclaringType(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE)));
+        CtInvocation assertInvocation = factory.createInvocation();
+
+        if (method.getType().isArray()) {
+            // if method returns an array, Assert.assertTrue(Arrays.equals(expected, actual))
+            executableReferenceForAssertion.setSimpleName("assertTrue");
+            assertInvocation.setExecutable(executableReferenceForAssertion);
+            assertInvocation.setTarget(factory.createTypeAccess(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE))));
+            CtInvocation arraysEqualsInvocation = factory.createInvocation();
+            CtExecutableReference<?> executableReferenceForArraysEquals = factory.createExecutableReference();
+            executableReferenceForArraysEquals.setStatic(true);
+            executableReferenceForArraysEquals.setDeclaringType(factory.createCtTypeReference(Class.forName(JAVA_UTIL_ARRAYS_REFERENCE)));
+            executableReferenceForArraysEquals.setSimpleName("equals");
+            arraysEqualsInvocation.setExecutable(executableReferenceForArraysEquals);
+            arraysEqualsInvocation.setTarget(factory.createTypeAccess(factory.createCtTypeReference(Class.forName(JAVA_UTIL_ARRAYS_REFERENCE))));
+            arraysEqualsInvocation.setArguments(Arrays.asList(assertExpectedObject, assertActualObject));
+            assertInvocation.setArguments(Collections.singletonList(arraysEqualsInvocation));
+        } else {
+            // Assert.assertEquals(expected, actual)
+            executableReferenceForAssertion.setSimpleName("assertEquals");
+            assertInvocation.setExecutable(executableReferenceForAssertion);
+            assertInvocation.setTarget(factory.createTypeAccess(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE))));
+            assertInvocation.setArguments(Arrays.asList(assertExpectedObject, assertActualObject));
+        }
+        return assertInvocation;
     }
 
     public CtMethod<?> generateTestMethod(CtMethod<?> method,
@@ -155,8 +174,8 @@ public class TestGenerator {
         }
         generatedMethod.setBody(methodBody);
 
-        CtInvocation<?> assertEqualsInvocation = generateAssertionInTestMethod(method);
-        generatedMethod.getBody().addStatement(assertEqualsInvocation);
+        CtInvocation<?> assertionInvocation = generateAssertionInTestMethod(method);
+        generatedMethod.getBody().addStatement(assertionInvocation);
         // System.out.println("Final method body: " + generatedMethod.getBody());
 
         return generatedMethod;
