@@ -51,7 +51,7 @@ public class PanktiGenMain implements Callable<Integer> {
         System.out.println("Number of Maven modules: " + projectPom.getModel().getModules().size());
 
         TestGenerator testGenerator = new TestGenerator();
-        System.out.println("Number of new test cases: " + testGenerator.process(model));
+        System.out.println("Number of new test cases: " + testGenerator.process(model, launcher));
 
         // Save model in outputdir/
 
