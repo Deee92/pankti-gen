@@ -14,6 +14,7 @@ import spoon.support.reflect.code.CtTryImpl;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class TestGenerator {
     private static Factory factory;
@@ -274,32 +275,46 @@ public class TestGenerator {
     }
 
     public List<CtType<?>> getTypesToProcess(CtModel ctModel) {
-        List<CtType<?>> types = new ArrayList<>();
-        for (CtType<?> type : ctModel.getAllTypes()) {
-            if (type.isClass() && !type.isAbstract())
-                types.add(type);
+        return ctModel.getAllTypes().
+                stream().
+                filter(CtType::isClass).
+                collect(Collectors.toList());
+    }
+
+    private CtMethod<?> findMethodToGenerateTestMethodsFor(List<CtMethod<?>> methodsByName, InstrumentedMethod instrumentedMethod) {
+        if (methodsByName.size() > 1) {
+            // match parameter list for overloaded methods
+            for (CtMethod<?> method : methodsByName) {
+                List<String> paramTypes = method.getParameters().stream().
+                        map(parameter -> parameter.getType().getQualifiedName()).
+                        collect(Collectors.toList());
+                if (Arrays.equals(paramTypes.toArray(), instrumentedMethod.getParamList().toArray())) {
+                    System.out.println("matched params: " + paramTypes);
+                    return method;
+                }
+            }
         }
-        return types;
+        return methodsByName.get(0);
     }
 
     public int process(CtModel ctModel, MavenLauncher launcher) {
         // Get list of instrumented methods from CSV file
         List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
+        System.out.println("Number of instrumented methods: " + instrumentedMethods.size());
         List<CtType<?>> types = getTypesToProcess(ctModel);
 
         for (CtType<?> type : types) {
-            if (instrumentedMethods.size() > 0) {
-                for (InstrumentedMethod instrumentedMethod : instrumentedMethods) {
-                    if (type.getQualifiedName().equals(instrumentedMethod.getParentFQN())) {
-                        List<CtMethod<?>> methodsByName = type.getMethodsByName(instrumentedMethod.getMethodName());
-                        if (methodsByName.size() == 1) {
-                            System.out.println("Generating test method for: " + methodsByName.get(0).getPath());
-                            try {
-                                CtClass<?> generatedClass = generateFullTestClass(type, methodsByName.get(0), instrumentedMethod, launcher);
-                                System.out.println("Generated test class: " + generatedClass.getQualifiedName());
-                            } catch (ClassNotFoundException e) {
-                                e.printStackTrace();
-                            }
+            for (InstrumentedMethod instrumentedMethod : instrumentedMethods) {
+                if (type.getQualifiedName().equals(instrumentedMethod.getParentFQN())) {
+                    List<CtMethod<?>> methodsByName = type.getMethodsByName(instrumentedMethod.getMethodName());
+                    if (methodsByName.size() > 0) {
+                        CtMethod<?> methodToGenerateTestsFor = findMethodToGenerateTestMethodsFor(methodsByName, instrumentedMethod);
+                        System.out.println("Generating test method for: " + methodToGenerateTestsFor.getPath());
+                        try {
+                            CtClass<?> generatedClass = generateFullTestClass(type, methodToGenerateTestsFor, instrumentedMethod, launcher);
+                            System.out.println("Generated test class: " + generatedClass.getQualifiedName());
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
                         }
                     }
                 }
