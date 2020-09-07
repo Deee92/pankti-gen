@@ -250,7 +250,8 @@ public class TestGenerator {
     public CtClass<?> generateFullTestClass(CtType<?> type,
                                             CtMethod<?> method,
                                             InstrumentedMethod instrumentedMethod,
-                                            MavenLauncher launcher) throws ClassNotFoundException {
+                                            MavenLauncher launcher,
+                                            String objectXMLDirectoryPath) throws ClassNotFoundException {
         factory = type.getFactory();
         CtClass<?> generatedClass = factory.Class().get(getGeneratedClassName(type.getPackage(), type.getSimpleName()));
         if (generatedClass == null) {
@@ -260,7 +261,8 @@ public class TestGenerator {
         }
         String methodPath = instrumentedMethod.getFullMethodPath();
         ObjectXMLParser objectXMLParser = new ObjectXMLParser();
-        Set<SerializedObject> serializedObjects = objectXMLParser.parseXML("/home/user/object-data/" + methodPath, instrumentedMethod.hasParams());
+        Set<SerializedObject> serializedObjects = objectXMLParser.parseXML(
+                objectXMLDirectoryPath + File.separatorChar + methodPath, instrumentedMethod.hasParams());
         System.out.println("Number of unique pairs/triples of object values: " + serializedObjects.size());
         numberOfTestCasesGenerated += serializedObjects.size();
 
@@ -275,10 +277,14 @@ public class TestGenerator {
     }
 
     public List<CtType<?>> getTypesToProcess(CtModel ctModel) {
-        return ctModel.getAllTypes().
-                stream().
+        List<CtType<?>> types = ctModel.getAllTypes().stream().
                 filter(CtType::isClass).
                 collect(Collectors.toList());
+        List<CtType<?>> typesToProcess = new ArrayList<>(types);
+        for (CtType<?> type: types) {
+            typesToProcess.addAll(type.getNestedTypes());
+        }
+        return typesToProcess;
     }
 
     private CtMethod<?> findMethodToGenerateTestMethodsFor(List<CtMethod<?>> methodsByName, InstrumentedMethod instrumentedMethod) {
@@ -289,7 +295,8 @@ public class TestGenerator {
                         map(parameter -> parameter.getType().getQualifiedName()).
                         collect(Collectors.toList());
                 if (Arrays.equals(paramTypes.toArray(), instrumentedMethod.getParamList().toArray())) {
-                    System.out.println("matched params: " + paramTypes);
+                    System.out.println("matched params " + paramTypes + " for overloaded method " +
+                            instrumentedMethod.getFullMethodPath());
                     return method;
                 }
             }
@@ -297,9 +304,9 @@ public class TestGenerator {
         return methodsByName.get(0);
     }
 
-    public int process(CtModel ctModel, MavenLauncher launcher) {
+    public int process(CtModel ctModel, MavenLauncher launcher, String methodCSVFilePath, String objectXMLDirectoryPath) {
         // Get list of instrumented methods from CSV file
-        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile("/home/user/two-methods.csv");
+        List<InstrumentedMethod> instrumentedMethods = CSVFileParser.parseCSVFile(methodCSVFilePath);
         System.out.println("Number of instrumented methods: " + instrumentedMethods.size());
         List<CtType<?>> types = getTypesToProcess(ctModel);
 
@@ -311,7 +318,9 @@ public class TestGenerator {
                         CtMethod<?> methodToGenerateTestsFor = findMethodToGenerateTestMethodsFor(methodsByName, instrumentedMethod);
                         System.out.println("Generating test method for: " + methodToGenerateTestsFor.getPath());
                         try {
-                            CtClass<?> generatedClass = generateFullTestClass(type, methodToGenerateTestsFor, instrumentedMethod, launcher);
+                            CtClass<?> generatedClass = generateFullTestClass(
+                                    type, methodToGenerateTestsFor, instrumentedMethod,
+                                    launcher, objectXMLDirectoryPath);
                             System.out.println("Generated test class: " + generatedClass.getQualifiedName());
                         } catch (ClassNotFoundException e) {
                             e.printStackTrace();

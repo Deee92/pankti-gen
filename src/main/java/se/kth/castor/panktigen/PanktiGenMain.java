@@ -12,12 +12,25 @@ import java.util.concurrent.Callable;
 @CommandLine.Command(
         name = "java -jar target/<pankti-gen-version-jar-with-dependencies.jar>",
         description = "pankti-gen generates test cases from serialized objects",
-        usageHelpWidth = 100)
+        usageHelpWidth = 200)
 public class PanktiGenMain implements Callable<Integer> {
     @CommandLine.Parameters(
+            index = "0",
             paramLabel = "PATH",
             description = "Path of the Maven project")
     private Path projectPath;
+
+    @CommandLine.Parameters(
+            index = "1",
+            paramLabel = "CSV_FILE",
+            description = "Path to CSV file with instrumented methods")
+    private Path methodCSVFilePath;
+
+    @CommandLine.Parameters(
+            index = "2",
+            paramLabel = "DIRECTORY_WITH_OBJECT_XML_FILES",
+            description = "Path to directory containing object XML files")
+    private Path objectXMLDirectoryPath;
 
     @CommandLine.Option(
             names = {"-h", "--help"},
@@ -31,8 +44,10 @@ public class PanktiGenMain implements Callable<Integer> {
         return projectPath;
     }
 
-    public PanktiGenMain(final Path projectPath, final boolean help) {
+    public PanktiGenMain(final Path projectPath, final Path methodCSVFilePath, final Path objectXMLDirectoryPath, final boolean help) {
         this.projectPath = projectPath;
+        this.methodCSVFilePath = methodCSVFilePath;
+        this.objectXMLDirectoryPath = objectXMLDirectoryPath;
         this.usageHelpRequested = help;
     }
 
@@ -51,7 +66,8 @@ public class PanktiGenMain implements Callable<Integer> {
         System.out.println("Number of Maven modules: " + projectPom.getModel().getModules().size());
 
         TestGenerator testGenerator = new TestGenerator();
-        System.out.println("Number of new test cases: " + testGenerator.process(model, launcher));
+        System.out.println("Number of new test cases: " + testGenerator.process(model, launcher,
+                methodCSVFilePath.toString(), objectXMLDirectoryPath.toString()));
 
         // Save model in outputdir/
 
