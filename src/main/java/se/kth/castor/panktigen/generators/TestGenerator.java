@@ -13,6 +13,7 @@ import spoon.support.reflect.code.CtTryImpl;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,7 +21,8 @@ public class TestGenerator {
     private static Factory factory;
     private static final String XSTREAM_REFERENCE = "com.thoughtworks.xstream.XStream";
     private static final String XSTREAM_CONSTRUCTOR = "new XStream()";
-    private static final String JUNIT_REFERENCE = "org.junit.Test";
+    private static final String JUNIT_TEST_REFERENCE = "org.junit.Test";
+    private static final String JUNIT_BEFORE_REFERENCE = "org.junit.Before";
     private static final String JUNIT_ASSERT_REFERENCE = "org.junit.Assert";
     private static final String JAVA_UTIL_ARRAYS_REFERENCE = "java.util.Arrays";
     private static final String JAVA_UTIL_SCANNER_REFERENCE = "java.util.Scanner";
@@ -44,7 +46,8 @@ public class TestGenerator {
 
     public void addImportsToGeneratedClass(CtClass<?> generatedClass) {
         generatedClass.getFactory().createUnresolvedImport(XSTREAM_REFERENCE, false);
-        generatedClass.getFactory().createUnresolvedImport(JUNIT_REFERENCE, false);
+        generatedClass.getFactory().createUnresolvedImport(JUNIT_TEST_REFERENCE, false);
+        generatedClass.getFactory().createUnresolvedImport(JUNIT_BEFORE_REFERENCE, false);
         generatedClass.getFactory().createUnresolvedImport(JUNIT_ASSERT_REFERENCE, false);
         generatedClass.getFactory().createUnresolvedImport(JAVA_UTIL_ARRAYS_REFERENCE, false);
         generatedClass.getFactory().createUnresolvedImport(JAVA_UTIL_SCANNER_REFERENCE, false);
@@ -78,6 +81,15 @@ public class TestGenerator {
                         method.getSimpleName(),
                         arguments.toString()));
 
+        if (method.getVisibility().equals(ModifierKind.PRIVATE)) {
+            assertActualObject = factory.createCodeSnippetExpression(
+                    String.format("%s%s.invoke(%s, %s)",
+                            method.getType().isArray() ? "(" + method.getType() + ") " : "",
+                            method.getSimpleName(),
+                            "receivingObject",
+                            arguments.toString()));
+        }
+
         CtExecutableReference<?> executableReferenceForAssertion = factory.createExecutableReference();
         executableReferenceForAssertion.setStatic(true);
         executableReferenceForAssertion.setDeclaringType(factory.createCtTypeReference(Class.forName(JUNIT_ASSERT_REFERENCE)));
@@ -107,10 +119,10 @@ public class TestGenerator {
         return assertInvocation;
     }
 
-    public String createLongXMLStringFile(String methodIdentifier, String longXML, MavenLauncher launcher) {
+    public String createLongXMLStringFile(String methodIdentifier, String xmlType, String longXML, MavenLauncher launcher) {
         String fileName = "";
         try {
-            File longXMLFile = new File("./tmp/object-data/" + methodIdentifier + ".txt");
+            File longXMLFile = new File("./tmp/object-data/" + methodIdentifier + "-" + xmlType + ".txt");
             longXMLFile.getParentFile().mkdirs();
             FileWriter myWriter = new FileWriter(longXMLFile);
             myWriter.write(longXML.replaceAll("\\\\\"", "\""));
@@ -124,17 +136,13 @@ public class TestGenerator {
         return fileName;
     }
 
-    public CtTryImpl createTryBlockToReadXML(String fileName) {
-        CtTryImpl tryBlock = (CtTryImpl) factory.createTry();
-        CtStatement classLoaderDeclaration = testGenUtil.addClassLoaderVariableToTestMethod(factory);
-        List<CtStatement> scannerDeclaration = testGenUtil.addScannerVariableToTestMethod(factory, fileName);
-        CtStatement stringReadFromScanner = testGenUtil.readStringFromScanner(factory);
-        CtBlock<?> tryBody = factory.createBlock();
-        tryBody.addStatement(classLoaderDeclaration);
-        scannerDeclaration.forEach(tryBody::addStatement);
-        tryBody.addStatement(stringReadFromScanner);
-        tryBlock.setBody(tryBody);
-        return tryBlock;
+    public List<CtStatement> readXMLFromFile(String fileName, String type) {
+        List<CtStatement> createScannerReadString = new ArrayList<>();
+        List<CtStatement> scannerDeclaration = testGenUtil.addScannerVariableToTestMethod(factory, fileName, type);
+        CtStatement stringReadFromScanner = testGenUtil.readStringFromScanner(factory, type);
+        createScannerReadString.addAll(scannerDeclaration);
+        createScannerReadString.add(stringReadFromScanner);
+        return createScannerReadString;
     }
 
     public CtStatement parseReceivingObject(String receivingObjectType) {
@@ -153,15 +161,16 @@ public class TestGenerator {
 
     public List<CtStatement> addAndParseMethodParams(String paramsXML, CtMethod<?> method) {
         List<CtStatement> paramStatements = new ArrayList<>();
-        CtStatement paramsXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "paramsXML", paramsXML);
-
+        if (paramsXML.length() <= 10000) {
+            CtStatement paramsXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "paramsXML", paramsXML);
+            paramStatements.add(paramsXMLStringDeclaration);
+        }
         CtStatement parseParamObjects = factory.createCodeSnippetStatement(
                 String.format(
                         "%s paramObjects = (%s) xStream.fromXML(paramsXML)",
                         "Object[]",
                         "Object[]"));
 
-        paramStatements.add(paramsXMLStringDeclaration);
         paramStatements.add(parseParamObjects);
 
         List<CtParameter<?>> parameters = method.getParameters();
@@ -177,6 +186,114 @@ public class TestGenerator {
         return paramStatements;
     }
 
+    public List<CtStatement> accessPrivateMethod(InstrumentedMethod instrumentedMethod) {
+        List<CtStatement> reflectionStatements = new ArrayList<>();
+        // Create Class<?> variable
+        CtExpression<String> classVariableExpression = factory.createCodeSnippetExpression(
+                "Class.forName(\"" + instrumentedMethod.getParentFQN() + "\")"
+        );
+        CtLocalVariable<?> classVariable = factory.createLocalVariable(
+                factory.createCtTypeReference(Class.class),
+                "Clazz",
+                classVariableExpression);
+
+        // Create param list
+        List<String> paramList = instrumentedMethod.getParamList();
+        StringBuilder paramString = new StringBuilder();
+        if (paramList.size() > 0) {
+            paramString = new StringBuilder(", ");
+            for (int i = 0; i < paramList.size(); i++) {
+                paramString.append(paramList.get(i)).append(".class");
+                if (i != paramList.size() - 1)
+                    paramString.append(", ");
+            }
+        }
+        // Create Method variable
+        CtExpression<String> methodVariableExpression = factory.createCodeSnippetExpression(
+                "Clazz.getDeclaredMethod(\"" + instrumentedMethod.getMethodName() + "\"" + paramString + ")"
+        );
+        CtLocalVariable<?> methodVariable = factory.createLocalVariable(
+                factory.createCtTypeReference(Method.class),
+                instrumentedMethod.getMethodName(),
+                methodVariableExpression);
+        CtStatement setAccessibleStatement = factory.createCodeSnippetStatement(instrumentedMethod.getMethodName() + ".setAccessible(true)");
+
+        reflectionStatements.add(classVariable);
+        reflectionStatements.add(methodVariable);
+        reflectionStatements.add(setAccessibleStatement);
+        return reflectionStatements;
+    }
+
+    public List<CtStatement> generateStatementsInMethodBody(InstrumentedMethod instrumentedMethod,
+                                                            CtMethod<?> method,
+                                                            int methodCounter,
+                                                            String receivingXML,
+                                                            String receivingObjectType,
+                                                            String returnedXML,
+                                                            String returnedObjectType,
+                                                            String paramsXML,
+                                                            MavenLauncher launcher) throws ClassNotFoundException {
+        List<CtStatement> methodBody = new ArrayList<>();
+        String methodIdentifier = instrumentedMethod.getFullMethodPath() + methodCounter;
+        if (receivingXML.length() > 10000 || returnedXML.length() > 10000 || paramsXML.length() > 10000) {
+            CtStatement classLoaderDeclaration = testGenUtil.addClassLoaderVariableToTestMethod(factory);
+            methodBody.add(classLoaderDeclaration);
+        }
+        if (receivingXML.length() > 10000) {
+            String type = "receiving";
+            String fileName = createLongXMLStringFile(methodIdentifier, type, receivingXML, launcher);
+            List<CtStatement> createScannerReadXML = readXMLFromFile(fileName, type);
+            methodBody.addAll(createScannerReadXML);
+        } else {
+            CtStatement receivingXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "receivingXML", receivingXML);
+            methodBody.add(receivingXMLStringDeclaration);
+        }
+        methodBody.add(parseReceivingObject(receivingObjectType));
+        if (returnedXML.length() > 10000) {
+            String type = "returned";
+            String fileName = createLongXMLStringFile(methodIdentifier, type, returnedXML, launcher);
+            List<CtStatement> createScannerReadXML = readXMLFromFile(fileName, type);
+            methodBody.addAll(createScannerReadXML);
+        } else {
+            CtStatement returnedXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "returnedXML", returnedXML);
+            methodBody.add(returnedXMLStringDeclaration);
+        }
+        methodBody.add(parseReturnedObject(returnedObjectType, method));
+        if (!paramsXML.isEmpty()) {
+            if (paramsXML.length() > 10000) {
+                String type = "params";
+                String fileName = createLongXMLStringFile(methodIdentifier, type, paramsXML, launcher);
+                List<CtStatement> createScannerReadXML = readXMLFromFile(fileName, type);
+                methodBody.addAll(createScannerReadXML);
+            }
+            List<CtStatement> paramStatements = addAndParseMethodParams(paramsXML, method);
+            methodBody.addAll(paramStatements);
+        }
+        if (instrumentedMethod.getVisibility().equals("private")) {
+            methodBody.addAll(accessPrivateMethod(instrumentedMethod));
+        }
+        methodBody.add(generateAssertionInTestMethod(method));
+        return methodBody;
+    }
+
+    public CtMethod<?> generateSetupMethod() throws ClassNotFoundException {
+        CtMethod<?> generatedMethod = factory.createMethod();
+        generatedMethod.setSimpleName("setUpXStream");
+        CtAnnotation<?> beforeAnnotation = factory.createAnnotation(factory.createCtTypeReference(Class.forName(JUNIT_BEFORE_REFERENCE)));
+        generatedMethod.addAnnotation(beforeAnnotation);
+        generatedMethod.setModifiers(Collections.singleton(ModifierKind.PUBLIC));
+        generatedMethod.setType(factory.createCtTypeReference(void.class));
+        CtBlock<?> methodBody = factory.createBlock();
+        CtStatement registerFileConverter = factory.createCodeSnippetStatement("xStream.registerConverter(new FileCleanableConverter())");
+        CtStatement registerInflaterConverter = factory.createCodeSnippetStatement("xStream.registerConverter(new InflaterConverter())");
+        CtStatement registerCleanerImplConverter = factory.createCodeSnippetStatement("xStream.registerConverter(new CleanerImplConverter())");
+        methodBody.addStatement(registerFileConverter);
+        methodBody.addStatement(registerInflaterConverter);
+        methodBody.addStatement(registerCleanerImplConverter);
+        generatedMethod.setBody(methodBody);
+        return generatedMethod;
+    }
+
     public CtMethod<?> generateTestMethod(CtMethod<?> method,
                                           int methodCounter,
                                           InstrumentedMethod instrumentedMethod,
@@ -184,7 +301,7 @@ public class TestGenerator {
                                           MavenLauncher launcher) throws ClassNotFoundException {
         CtMethod<?> generatedMethod = factory.createMethod();
         generatedMethod.setSimpleName("test" + method.getSimpleName().substring(0, 1).toUpperCase() + method.getSimpleName().substring(1) + methodCounter);
-        CtAnnotation<?> testAnnotation = factory.createAnnotation(factory.createCtTypeReference(Class.forName(JUNIT_REFERENCE)));
+        CtAnnotation<?> testAnnotation = factory.createAnnotation(factory.createCtTypeReference(Class.forName(JUNIT_TEST_REFERENCE)));
         generatedMethod.addAnnotation(testAnnotation);
         generatedMethod.setModifiers(Collections.singleton(ModifierKind.PUBLIC));
         generatedMethod.setType(factory.createCtTypeReference(void.class));
@@ -195,30 +312,22 @@ public class TestGenerator {
         String returnedXML = serializedObject.getReturnedObject();
         String returnedObjectType = instrumentedMethod.getReturnType();
 
+        String paramsXML = "";
+        if (instrumentedMethod.hasParams()) {
+            paramsXML = serializedObject.getParamObjects();
+        }
+
         CtBlock<?> methodBody = factory.createBlock();
 
-        // If receivingXML string is too long, read string from a resource file
-        if (receivingXML.length() > 10000) {
-            String methodIdentifier = instrumentedMethod.getFullMethodPath() + methodCounter;
-            String fileName = createLongXMLStringFile(methodIdentifier, receivingXML, launcher);
-            CtTryImpl tryBlock = createTryBlockToReadXML(fileName);
-            CtBlock<?> tryBody = tryBlock.getBody();
+        List<CtStatement> statementsInMethodBody =
+                generateStatementsInMethodBody(instrumentedMethod, method, methodCounter,
+                        receivingXML, receivingObjectType, returnedXML, returnedObjectType, paramsXML, launcher);
 
-            CtStatement returnedXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "returnedXML", returnedXML);
-            CtStatement parseReceivingObject = parseReceivingObject(receivingObjectType);
-            CtStatement parseReturnedObject = parseReturnedObject(returnedObjectType, method);
-
-            tryBody.addStatement(returnedXMLStringDeclaration);
-            tryBody.addStatement(parseReceivingObject);
-            tryBody.addStatement(parseReturnedObject);
-
-            if (instrumentedMethod.hasParams()) {
-                String paramsXML = serializedObject.getParamObjects();
-                List<CtStatement> paramStatements = addAndParseMethodParams(paramsXML, method);
-                paramStatements.forEach(tryBody::addStatement);
-            }
-            CtInvocation<?> assertionInvocation = generateAssertionInTestMethod(method);
-            tryBody.addStatement(assertionInvocation);
+        // if XML strings are too long, or method is private, enclose statements within a try block
+        if (receivingXML.length() > 10000 || returnedXML.length() > 10000 || paramsXML.length() > 10000 || instrumentedMethod.getVisibility().equals("private")) {
+            CtTryImpl tryBlock = (CtTryImpl) factory.createTry();
+            CtBlock<?> tryBody = factory.createBlock();
+            statementsInMethodBody.forEach(tryBody::addStatement);
             tryBlock.setBody(tryBody);
             CtBlock<?> catchBlock = factory.createBlock();
             CtStatement failAssertionStatement = factory.createCodeSnippetStatement("Assert.fail()");
@@ -228,21 +337,8 @@ public class TestGenerator {
             tryBlock.addCatcher(factory.createCtCatch("e", Exception.class, catchBlock));
             methodBody.addStatement(tryBlock);
         } else {
-            CtStatement receivingXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "receivingXML", receivingXML);
-            CtStatement returnedXMLStringDeclaration = testGenUtil.addStringVariableToTestMethod(factory, "returnedXML", returnedXML);
-            methodBody.addStatement(receivingXMLStringDeclaration);
-            methodBody.addStatement(returnedXMLStringDeclaration);
-            methodBody.addStatement(parseReceivingObject(receivingObjectType));
-            methodBody.addStatement(parseReturnedObject(returnedObjectType, method));
-            if (instrumentedMethod.hasParams()) {
-                String paramsXML = serializedObject.getParamObjects();
-                List<CtStatement> paramStatements = addAndParseMethodParams(paramsXML, method);
-                paramStatements.forEach(methodBody::addStatement);
-            }
-            CtInvocation<?> assertionInvocation = generateAssertionInTestMethod(method);
-            methodBody.addStatement(assertionInvocation);
+            statementsInMethodBody.forEach(methodBody::addStatement);
         }
-
         generatedMethod.setBody(methodBody);
         return generatedMethod;
     }
@@ -266,6 +362,9 @@ public class TestGenerator {
         System.out.println("Number of unique pairs/triples of object values: " + serializedObjects.size());
         numberOfTestCasesGenerated += serializedObjects.size();
 
+        // Create @Before method
+        // generatedClass.addMethod(generateSetupMethod());
+
         // Create @Test method
         int methodCounter = 1;
         for (SerializedObject serializedObject : serializedObjects) {
@@ -281,7 +380,7 @@ public class TestGenerator {
                 filter(CtType::isClass).
                 collect(Collectors.toList());
         List<CtType<?>> typesToProcess = new ArrayList<>(types);
-        for (CtType<?> type: types) {
+        for (CtType<?> type : types) {
             typesToProcess.addAll(type.getNestedTypes());
         }
         return typesToProcess;

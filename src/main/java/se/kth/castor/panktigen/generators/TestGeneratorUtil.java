@@ -32,7 +32,9 @@ public class TestGeneratorUtil {
         );
     }
 
-    public List<CtStatement> addScannerVariableToTestMethod(Factory factory, String fileName) {
+    public List<CtStatement> addScannerVariableToTestMethod(Factory factory, String fileName, String type) {
+        String fileVariableName = "file" + type;
+        String scannerVariableName = "scanner" + type;
         List<CtStatement> fileAndScannerStatements = new ArrayList<>();
         // Create file
         CtExpression<String> fileVariableExpression = factory.createCodeSnippetExpression(
@@ -40,15 +42,15 @@ public class TestGeneratorUtil {
         );
         CtLocalVariable<?> fileVariable = factory.createLocalVariable(
                 factory.createCtTypeReference(File.class),
-                "file",
+                fileVariableName,
                 fileVariableExpression);
         // Create scanner
         CtExpression<String> scannerVariableExpression = factory.createCodeSnippetExpression(
-                "new Scanner(file)"
+                "new Scanner(" + fileVariableName + ")"
         );
         CtLocalVariable<?> scannerVariable =  factory.createLocalVariable(
                 factory.createCtTypeReference(Scanner.class),
-                "scanner",
+                scannerVariableName,
                 scannerVariableExpression
         );
         fileAndScannerStatements.add(fileVariable);
@@ -56,13 +58,15 @@ public class TestGeneratorUtil {
         return fileAndScannerStatements;
     }
 
-    public CtLocalVariable<String> readStringFromScanner(Factory factory) {
+    public CtLocalVariable<String> readStringFromScanner(Factory factory, String type) {
+        String scannerVariableName = "scanner" + type;
+        String xmlVariableName = type + "XML";
         CtExpression<String> variableExpression = factory.createCodeSnippetExpression(
-                "scanner.useDelimiter(\"\\\\A\").next()"
+                scannerVariableName + ".useDelimiter(\"\\\\A\").next()"
         );
         return factory.createLocalVariable(
                 factory.createCtTypeReference(String.class),
-                "receivingXML",
+                xmlVariableName,
                 variableExpression
         );
     }

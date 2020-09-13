@@ -11,6 +11,7 @@ public class CSVFileParser {
     static final String csvMethodNameField = "method-name";
     static final String csvParamListField = "param-list";
     static final String csvReturnTypeField = "return-type";
+    static final String csvVisibilityField = "visibility";
 
     public static List<InstrumentedMethod> parseCSVFile(String filePath) {
         List<InstrumentedMethod> instrumentedMethods = new ArrayList<>();
@@ -22,6 +23,7 @@ public class CSVFileParser {
                 String methodName = record.get(csvMethodNameField);
                 String params = record.get(csvParamListField);
                 String returnType = record.get(csvReturnTypeField);
+                String visibility = record.get(csvVisibilityField);
 
                 List<String> paramList = new ArrayList<>();
                 if (!params.isEmpty()) {
@@ -29,7 +31,7 @@ public class CSVFileParser {
                     paramList = new ArrayList<>(Arrays.asList(params.split(",")));
                 }
 
-                instrumentedMethods.add(new InstrumentedMethod(parentFQN, methodName, paramList, returnType));
+                instrumentedMethods.add(new InstrumentedMethod(parentFQN, methodName, paramList, returnType, visibility));
             }
         } catch (Exception e) {
             e.printStackTrace();

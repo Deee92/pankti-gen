@@ -7,12 +7,14 @@ public class InstrumentedMethod {
     String methodName;
     List<String> paramList;
     String returnType;
+    String visibility;
 
-    public InstrumentedMethod(String parentFQN, String methodName, List<String> paramList, String returnType) {
+    public InstrumentedMethod(String parentFQN, String methodName, List<String> paramList, String returnType, String visibility) {
         this.parentFQN = parentFQN;
         this.methodName = methodName;
         this.paramList = paramList;
         this.returnType = returnType.replaceAll("\\$", ".");
+        this.visibility = visibility;
     }
 
     public String getParentFQN() {
@@ -35,6 +37,10 @@ public class InstrumentedMethod {
         return this.getParamList().size() > 0;
     }
 
+    public String getVisibility() {
+        return visibility;
+    }
+
     public String getFullMethodPath() {
         return this.parentFQN + "." + this.getMethodName();
     }
@@ -46,6 +52,7 @@ public class InstrumentedMethod {
                 ", methodName='" + methodName + '\'' +
                 ", paramList=" + paramList +
                 ", returnType='" + returnType + '\'' +
+                ", visibility='" + visibility + '\'' +
                 '}';
     }
 }
