@@ -122,7 +122,7 @@ public class TestGenerator {
     public String createLongXMLStringFile(String methodIdentifier, String xmlType, String longXML, MavenLauncher launcher) {
         String fileName = "";
         try {
-            File longXMLFile = new File("./tmp/object-data/" + methodIdentifier + "-" + xmlType + ".txt");
+            File longXMLFile = new File("./tmp/object-data/" + methodIdentifier + "-" + xmlType + ".xml");
             longXMLFile.getParentFile().mkdirs();
             FileWriter myWriter = new FileWriter(longXMLFile);
             myWriter.write(longXML.replaceAll("\\\\\"", "\""));
