@@ -24,7 +24,7 @@
     <info.picocli.picocli.version>4.2.0</info.picocli.picocli.version>
     <sl4j.version>1.7.30</sl4j.version>
     <commons.csv.version>1.8</commons.csv.version>
-    <xstream.version>1.4.12</xstream.version>
+    <xstream.version>1.4.18</xstream.version>
   </properties>
 
   <dependencies>
